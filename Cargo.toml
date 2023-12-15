@@ -1,0 +1,23 @@
+[package]
+name = "mogrify"
+version = "0.1.0"
+edition = "2021"
+license = "MIT"
+keywords = ["parsing", "validation"]
+authors = ["Thomas Alton"]
+description = "Utility macro for autogenerating a \"Parse, Don't Validate\" `TryFrom` implementation for structs"
+homepage = "https://github.com/moatra/mogrify"
+repository = "https://github.com/moatra/mogrify"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+mogrify_derive = { path = "mogrify_derive", version = "0.1.0" }
+
+
+[workspace]
+
+members = [
+    "mogrify_derive",
+]
+
