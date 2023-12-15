@@ -105,10 +105,11 @@ pub(crate) fn derive_enum(ident: Ident, sources: Vec<MogrifyStructAttrs>, data: 
                     .map(|field| field.assignment_expr())
                     .collect::<Vec<_>>();
 
+                let source_name_string = source_name.to_string();
                 variant_matches.extend(quote! {
                     #source_name { #(#destructure_instr),* } => {
                         #(#capture_instr)*
-                        ::mogrify::MogrificationError::condense(errors)?;
+                        ::mogrify::MogrificationError::condense(errors).at_field(#source_name_string)?;
                         Self::#variant_name {
                             #(#assign_instr),*
                         }
