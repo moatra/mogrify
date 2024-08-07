@@ -1,5 +1,5 @@
-use proc_macro2::Span;
 use crate::attrs::{extract_mogrify_meta, MogrifyFieldAttrs};
+use proc_macro2::Span;
 use quote::{quote, TokenStreamExt};
 use syn::{Field, GenericArgument, Ident, PathArguments, Type, TypePath};
 
@@ -8,7 +8,7 @@ pub(crate) struct MogrifyFieldInfo {
     pub(crate) local_ident: Ident,
     pub(crate) source_ident: Option<Ident>,
     pub(crate) attrs: MogrifyFieldAttrs,
-    pub(crate) specialization: MogrifyFieldSpecialization
+    pub(crate) specialization: MogrifyFieldSpecialization,
 }
 
 #[allow(dead_code)]
@@ -29,21 +29,35 @@ pub(crate) enum MogrifyFieldSpecialization {
 }
 impl MogrifyFieldInfo {
     pub(crate) fn destructure_expr(&self) -> proc_macro2::TokenStream {
-        let Self {local_ident, source_ident, ..} = self;
+        let Self {
+            local_ident,
+            source_ident,
+            ..
+        } = self;
         match source_ident {
             None => quote!(#local_ident),
             Some(source_ident) => quote!(#source_ident: #local_ident),
         }
     }
     pub(crate) fn assignment_expr(&self) -> proc_macro2::TokenStream {
-        let Self {local_ident, source_ident, ..} = self;
+        let Self {
+            local_ident,
+            source_ident,
+            ..
+        } = self;
         match source_ident {
             None => quote!(#local_ident.unwrap()),
             Some(source_ident) => quote!(#source_ident: #local_ident.unwrap()),
         }
     }
     pub(crate) fn conversion(&self, field_count: usize) -> proc_macro2::TokenStream {
-        let Self { idx, local_ident, source_ident, attrs, specialization } = self;
+        let Self {
+            idx,
+            local_ident,
+            source_ident,
+            attrs,
+            specialization,
+        } = self;
         let mut conversion_expr = match &attrs.default {
             None => quote!(Ok(#local_ident)),
             Some(None) => {
@@ -177,14 +191,9 @@ impl TryFrom<(usize, Field)> for MogrifyFieldInfo {
             }
             Type::Path(path) if type_shape_check(&path, "HashMap", 2) => {
                 let (key_ty, value_ty) = extract_double_generic(path);
-                MogrifyFieldSpecialization::Map {
-                    key_ty,
-                    value_ty,
-                }
+                MogrifyFieldSpecialization::Map { key_ty, value_ty }
             }
-            _ => MogrifyFieldSpecialization::None {
-                ty: value.ty,
-            },
+            _ => MogrifyFieldSpecialization::None { ty: value.ty },
         };
         let local_ident = Ident::new(&format!("local{idx}"), Span::mixed_site());
         Ok(MogrifyFieldInfo {

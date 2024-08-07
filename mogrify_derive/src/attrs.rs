@@ -136,17 +136,11 @@ impl TryFrom<Vec<Attribute>> for MogrifyVariantAttrs {
                     source = Some(ident);
                     return Ok(());
                 }
-                Err(meta.error(
-                    r#"expected "source=...""#
-                ))
+                Err(meta.error(r#"expected "source=...""#))
             })?;
-            Ok(MogrifyVariantAttrs {
-                source,
-            })
+            Ok(MogrifyVariantAttrs { source })
         } else {
-            Ok(MogrifyVariantAttrs {
-                source: None,
-            })
+            Ok(MogrifyVariantAttrs { source: None })
         }
     }
 }
