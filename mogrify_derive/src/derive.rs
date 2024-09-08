@@ -122,7 +122,7 @@ pub(crate) fn derive_struct(
 
                 fn try_from(from: #source) -> Result<Self, Self::Error> {
                     use ::mogrify::Pathed;
-                    let mut errors = ::std::vec::Vec::new();
+                    let mut errors = ::std::vec::Vec::<::mogrify::MogrificationError>::new();
 
                     let #match_expr { #(#destructure_instr),* } = from;
 
@@ -260,7 +260,7 @@ pub(crate) fn derive_enum(
 
                 fn try_from(from: #source) -> Result<Self, Self::Error> {
                     use ::mogrify::Pathed;
-                    let mut errors = ::std::vec::Vec::new();
+                    let mut errors = ::std::vec::Vec::<::mogrify::MogrificationError>::new();
 
                     Ok(match from {
                         #(#match_expr :: #variant_matches),*
