@@ -2,7 +2,10 @@ use crate::attrs::{extract_mogrify_meta, MogrifyStructAttrs, MogrifyVariantAttrs
 use crate::fields::MogrifyFieldInfo;
 use proc_macro2::{Ident, Span, TokenStream};
 use quote::quote;
-use syn::{Data, DataEnum, DataStruct, DeriveInput, Error, Fields, GenericArgument, PathArguments, Type, TypePath};
+use syn::{
+    Data, DataEnum, DataStruct, DeriveInput, Error, Fields, GenericArgument, PathArguments, Type,
+    TypePath,
+};
 
 pub(crate) fn derive_inner(input: DeriveInput) -> Result<TokenStream, Error> {
     let ident = input.ident;
@@ -39,34 +42,38 @@ fn turbofish_match_pattern(type_path: &TypePath) -> TokenStream {
         tokens.extend(quote! {#ident});
 
         if let PathArguments::AngleBracketed(ref args) = segment.arguments {
-            let args_tokens: Vec<TokenStream> = args.args.iter().map(|arg| match arg {
-                GenericArgument::Lifetime(lifetime) => {
-                    quote! {#lifetime}
-                }
-                GenericArgument::Type(Type::Path(type_path)) => {
-                    let nested_tokens = turbofish_match_pattern(type_path);
-                    quote! {#nested_tokens}
-                }
-                GenericArgument::Const(constant) => {
-                    quote! {#constant}
-                }
-                GenericArgument::AssocType(assoc) => {
-                    let ident = &assoc.ident;
-                    let ty = &assoc.ty;
-                    quote! {#ident = #ty}
-                }
-                GenericArgument::AssocConst(assoc) => {
-                    let ident = &assoc.ident;
-                    let ty = &assoc.value;
-                    quote! {#ident = #ty}
-                }
-                GenericArgument::Constraint(constraint) => {
-                    let ident = &constraint.ident;
-                    let bounds = &constraint.bounds;
-                    quote! {#ident: #bounds}
-                }
-                _ => panic!("Unexpected generic argument"),
-            }).collect();
+            let args_tokens: Vec<TokenStream> = args
+                .args
+                .iter()
+                .map(|arg| match arg {
+                    GenericArgument::Lifetime(lifetime) => {
+                        quote! {#lifetime}
+                    }
+                    GenericArgument::Type(Type::Path(type_path)) => {
+                        let nested_tokens = turbofish_match_pattern(type_path);
+                        quote! {#nested_tokens}
+                    }
+                    GenericArgument::Const(constant) => {
+                        quote! {#constant}
+                    }
+                    GenericArgument::AssocType(assoc) => {
+                        let ident = &assoc.ident;
+                        let ty = &assoc.ty;
+                        quote! {#ident = #ty}
+                    }
+                    GenericArgument::AssocConst(assoc) => {
+                        let ident = &assoc.ident;
+                        let ty = &assoc.value;
+                        quote! {#ident = #ty}
+                    }
+                    GenericArgument::Constraint(constraint) => {
+                        let ident = &constraint.ident;
+                        let bounds = &constraint.bounds;
+                        quote! {#ident: #bounds}
+                    }
+                    _ => panic!("Unexpected generic argument"),
+                })
+                .collect();
 
             tokens.extend(quote! {::<#(#args_tokens),*>});
         }
@@ -107,7 +114,7 @@ pub(crate) fn derive_struct(
 
     let mut tokens = TokenStream::new();
 
-    for MogrifyStructAttrs { source } in sources {
+    for MogrifyStructAttrs { source, grpc: _ } in sources {
         let match_expr = turbofish_match_pattern(&source);
         tokens.extend(quote! {
             impl TryFrom<#source> for #ident {
@@ -132,11 +139,10 @@ pub(crate) fn derive_struct(
     Ok(tokens)
 }
 
-pub(crate) fn derive_enum(
-    ident: Ident,
-    sources: Vec<MogrifyStructAttrs>,
+fn build_match_instr(
+    source: MogrifyStructAttrs,
     data: DataEnum,
-) -> Result<TokenStream, Error> {
+) -> Result<Vec<TokenStream>, Error> {
     let mut variant_matches = Vec::<TokenStream>::new();
 
     for variant in data.variants {
@@ -144,7 +150,7 @@ pub(crate) fn derive_enum(
         let source_name = variant_attrs
             .source
             .unwrap_or_else(|| variant.ident.clone());
-        let variant_name = variant.ident;
+        let variant_name = &variant.ident;
         match variant.fields {
             Fields::Named(fields) => {
                 let fields = fields
@@ -222,17 +228,32 @@ pub(crate) fn derive_enum(
             }
             Fields::Unit => {
                 // can use source_name directly because we'll bring all variants in scope in the try_from body
-                variant_matches.push(quote! {
-                    #source_name => Self::#variant_name
-                })
+                if source.grpc {
+                    variant_matches.push(quote! {
+                        #source_name(()) => Self::#variant_name
+                    })
+                } else {
+                    variant_matches.push(quote! {
+                        #source_name => Self::#variant_name
+                    })
+                }
             }
         }
     }
+    Ok(variant_matches)
+}
 
+pub(crate) fn derive_enum(
+    ident: Ident,
+    attrs: Vec<MogrifyStructAttrs>,
+    data: DataEnum,
+) -> Result<TokenStream, Error> {
     let mut tokens = TokenStream::new();
 
-    for MogrifyStructAttrs { source } in sources {
-        let match_expr = turbofish_match_pattern(&source);
+    for attr in attrs {
+        let match_expr = turbofish_match_pattern(&attr.source);
+        let source = attr.source.clone();
+        let variant_matches = build_match_instr(attr, data.clone())?;
         tokens.extend(quote! {
             impl TryFrom<#source> for #ident {
                 type Error = ::mogrify::MogrificationError;

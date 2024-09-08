@@ -73,7 +73,7 @@ impl MogrificationError {
 impl Display for MogrificationError {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         if self.failures.len() == 1 {
-            let err = self.failures.get(0).unwrap();
+            let err = self.failures.first().unwrap();
             std::fmt::Display::fmt(&err, f)
         } else {
             // todo: test for formatting
@@ -89,7 +89,7 @@ impl Display for MogrificationError {
 impl Error for MogrificationError {
     fn source(&self) -> Option<&(dyn Error + 'static)> {
         if self.failures.len() == 1 {
-            let details: &MogrifyFailure = self.failures.get(0).unwrap();
+            let details: &MogrifyFailure = self.failures.first().unwrap();
             details.source()
         } else {
             None

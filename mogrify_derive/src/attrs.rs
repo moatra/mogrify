@@ -1,6 +1,7 @@
 use proc_macro2::Ident;
+use syn::parse::ParseStream;
 use syn::spanned::Spanned;
-use syn::{parse_quote, Attribute, Error, Expr, TypePath};
+use syn::{parse_quote, Attribute, Error, Expr, Path, Token, TypePath};
 
 pub(crate) struct MogrifyFieldAttrs {
     // Option::ok()
@@ -17,6 +18,8 @@ pub(crate) struct MogrifyFieldAttrs {
 
 pub(crate) struct MogrifyStructAttrs {
     pub(crate) source: TypePath,
+    // For enums, map any unit variants `Unit` to an empty tuple `Unit(())`
+    pub(crate) grpc: bool,
 }
 
 pub(crate) struct MogrifyVariantAttrs {
@@ -110,8 +113,29 @@ impl TryFrom<Attribute> for MogrifyStructAttrs {
     type Error = Error;
 
     fn try_from(value: Attribute) -> Result<Self, Self::Error> {
-        let source: TypePath = value.parse_args()?;
-        Ok(MogrifyStructAttrs { source })
+        value.parse_args_with(|input: ParseStream| {
+            // Source type is first argument, always
+            let source: TypePath = input.parse()?;
+            let mut grpc = false;
+
+            // from here on out, we're basically emulating `syn::meta::ParsedNestedMeta`, but without the "accept keywords in the path" logic
+            // because for some reason `parse_meta_path` is not a public function.
+            while !input.is_empty() {
+                input.parse::<Token![,]>()?;
+                if input.is_empty() {
+                    break;
+                }
+                let path = input.parse::<Path>()?;
+
+                if path.is_ident("grpc") {
+                    grpc = true;
+                } else {
+                    return Err(Error::new_spanned(path, "unrecognized argument"));
+                }
+            }
+
+            Ok(MogrifyStructAttrs { source, grpc })
+        })
     }
 }
 
